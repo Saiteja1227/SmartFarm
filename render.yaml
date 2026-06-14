@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: smartfarm-ai
+    runtime: python
+    pythonVersion: "3.11"
+    rootDir: python-app
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT "run:app"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: MONGODB_URI
+        sync: false          # set this in Render dashboard — keep secret
+      - key: ML_MODEL_URL
+        value: http://localhost:8000
+      - key: MAX_CONTENT_LENGTH
+        value: "10485760"
+      - key: SECRET_KEY
+        generateValue: true  # Render auto-generates a secure value
