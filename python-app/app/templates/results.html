@@ -176,7 +176,7 @@ function renderResults(d) {
   document.getElementById('confidenceBadge').style.background = sCfg.color;
 
   // Disease
-  const isHealthy  = d.disease_name === 'None';
+  const isHealthy  = d.plant_status === 'Healthy' || d.disease_name === 'None';
   const isUnknown  = d.disease_name === 'Unable to Identify';
   document.getElementById('diseaseText').textContent = isHealthy  ? '✅ No Disease' :
                                                        isUnknown  ? '❓ Unable to Identify' :

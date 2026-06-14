@@ -273,6 +273,16 @@ def analyse_visual_symptoms(image_bytes: bytes) -> dict:
     }
 
 
+def _strong_healthy_signal(healthy_ratio: float, disease_ratio: float, severity: int, symptoms: list) -> bool:
+    """Return True when the image is overwhelmingly consistent with a healthy leaf."""
+    return (
+        healthy_ratio >= 0.68
+        and disease_ratio < 0.08
+        and severity <= 8
+        and len(symptoms) <= 1
+    )
+
+
 # ════════════════════════════════════════════════════════════════════════════
 #  DEMO / FALLBACK PREDICTION
 #  Used when no trained model is available.
@@ -319,10 +329,30 @@ def demo_predict(image_bytes: bytes) -> dict:
     seed     = int(abs(arr_tiny.mean() * 1000)) % (2 ** 31)
     rng      = random.Random(seed)
 
+    # Strong healthy signal should win over weak symptom noise.
+    if _strong_healthy_signal(healthy_ratio, disease_ratio, severity, symptoms):
+        label      = rng.choice(_DEMO_HEALTHY_LABELS)
+        confidence = round(rng.uniform(84, 96), 1)
+        reason     = "Strong healthy visual signal detected. No meaningful disease symptoms found."
+        plant_status = "Healthy"
+        disease_name = "None"
+        rec, water   = DISEASE_RECOMMENDATIONS.get(label, ("Plant is healthy. Maintain current care routine.", "Low"))
+        recommendation = WATER_STRESS_RECOMMENDATIONS.get(water, rec)
+        return {
+            "plantStatus": plant_status,
+            "diseaseName": disease_name,
+            "confidence": confidence,
+            "waterStress": water,
+            "recommendation": recommendation,
+            "resourceOptimization": RESOURCE_OPTIMIZATION.get(water, ""),
+            "visibleSymptoms": symptoms,
+            "predictionReason": reason,
+        }
+
     # ── Decision logic ────────────────────────────────────────────────────────
 
     # RULE 1: Significant visual symptoms → always Diseased
-    if severity >= 20 or len(symptoms) >= 2:
+    if severity >= 25 or len(symptoms) >= 3:
         label      = rng.choice(_DEMO_DISEASE_LABELS)
         confidence = round(rng.uniform(72, 91), 1)
         # Boost confidence if many symptoms present
@@ -331,7 +361,7 @@ def demo_predict(image_bytes: bytes) -> dict:
         reason = f"Visual symptom analysis detected: {'; '.join(symptoms[:3])}."
 
     # RULE 2: Moderate symptoms — likely Diseased but lower confidence
-    elif severity >= 10 or disease_ratio > 0.08:
+    elif severity >= 12 or disease_ratio > 0.12:
         label      = rng.choice(_DEMO_DISEASE_LABELS)
         confidence = round(rng.uniform(60, 78), 1)
         reason     = "Mild visual symptoms detected. Possible early-stage disease."
@@ -440,9 +470,22 @@ def real_predict(image_bytes: bytes) -> dict:
     symptoms_data  = analyse_visual_symptoms(image_bytes)
     symptoms       = symptoms_data["symptoms"]
     severity       = symptoms_data["severity_score"]
+    healthy_ratio  = symptoms_data["healthy_pixel_ratio"]
     disease_ratio  = symptoms_data["disease_pixel_ratio"]
 
     reason = ""
+
+    # Strong healthy signal should override weak disease-leaning output.
+    healthy_candidate = next(
+        ((lbl, conf) for lbl, conf in top5 if "healthy" in lbl),
+        None,
+    )
+    if healthy_candidate and _strong_healthy_signal(healthy_ratio, disease_ratio, severity, symptoms):
+        top_label = healthy_candidate[0]
+        top_confidence = max(healthy_candidate[1], 80.0)
+        reason = (
+            f"Strong healthy visual signal detected. Overriding disease-leaning model output with {top_label.replace('___', ' — ')}."
+        )
 
     # ── Safety Rule A: Model says Healthy but visual symptoms exist ───────────
     if "healthy" in top_label and (severity >= 20 or len(symptoms) >= 2):
