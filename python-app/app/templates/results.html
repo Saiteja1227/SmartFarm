@@ -39,7 +39,7 @@
       <!-- Plant Image -->
       <div class="card results-img-card">
         <h3 class="card-title">🌿 Plant Image</h3>
-        <img id="plantImg" src="" alt="Analysed plant leaf" class="results-plant-img"
+           <img id="plantImg" src="" alt="Analysed plant leaf" class="results-plant-img"
              onerror="this.style.display='none'; document.getElementById('imgFallback').style.display='flex';" />
         <div id="imgFallback" class="img-fallback" style="display:none;">🌿 Preview unavailable</div>
       </div>
@@ -161,7 +161,8 @@ function renderResults(d) {
   document.getElementById('resultsMeta').textContent = `🕐 ${dt} • ${d.image_name}`;
 
   // Image
-  document.getElementById('plantImg').src = d.image_url;
+  const plantImg = document.getElementById('plantImg');
+  plantImg.src = d.image_preview || d.image_url || '';
 
   // Status card
   const sCfg     = STATUS_CONFIG[d.plant_status] || STATUS_CONFIG.Unknown;

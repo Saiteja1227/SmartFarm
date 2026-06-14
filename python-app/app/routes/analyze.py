@@ -4,7 +4,9 @@ Accepts a plant leaf image, runs ML analysis, saves to MongoDB, returns result.
 """
 
 import os
+import base64
 import uuid
+from io import BytesIO
 from datetime import datetime, timezone
 
 import requests
@@ -22,6 +24,22 @@ ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _build_preview_data_url(file_path: str) -> str:
+    try:
+        from PIL import Image
+
+        with Image.open(file_path) as img:
+            preview = img.convert("RGB")
+            preview.thumbnail((640, 640))
+            buffer = BytesIO()
+            preview.save(buffer, format="JPEG", quality=82, optimize=True)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+    except Exception as exc:
+        current_app.logger.warning("Preview generation failed: %s", exc)
+        return ""
 
 
 def _call_ml_model(file_path: str, file_name: str) -> dict:
@@ -90,6 +108,7 @@ def analyze():
         file.save(save_path)
 
         image_url  = f"/static/uploads/{safe_name}"
+        image_preview = _build_preview_data_url(save_path)
         prediction = _call_ml_model(save_path, safe_name)
 
         plant_status     = prediction.get("plantStatus")   or prediction.get("plant_status")   or "Unknown"
@@ -103,6 +122,7 @@ def analyze():
 
         doc = build_document(
             image_url=image_url,
+            image_preview=image_preview,
             image_name=file.filename,
             plant_status=plant_status,
             disease_name=disease_name,

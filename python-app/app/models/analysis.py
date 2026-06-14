@@ -16,6 +16,7 @@ VALID_WATER_STRESS = {"Low", "Moderate", "High", "Critical"}
 
 def build_document(
     image_url: str,
+    image_preview: str = "",
     image_name: str = "plant_image.jpg",
     plant_status: str = "Unknown",
     disease_name: str = "None",
@@ -30,6 +31,7 @@ def build_document(
     now = datetime.now(timezone.utc)
     return {
         "image_url":           image_url,
+        "image_preview":       image_preview,
         "image_name":          image_name,
         "plant_status":        plant_status if plant_status in VALID_PLANT_STATUS else "Unknown",
         "disease_name":        disease_name,
@@ -55,6 +57,7 @@ def serialize(doc: dict) -> dict:
         if field in result and isinstance(result[field], datetime):
             result[field] = result[field].isoformat()
     # Ensure new fields always present in serialised output
+    result.setdefault("image_preview", "")
     result.setdefault("visible_symptoms", [])
     result.setdefault("prediction_reason", "")
     return result
