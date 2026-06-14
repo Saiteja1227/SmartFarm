@@ -1,0 +1,49 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ───────────────────────────────────────────────────
+venv/
+env/
+.venv/
+ENV/
+
+# ── Environment / secrets ──────────────────────────────────────────────────
+.env
+.env.*
+*.env
+
+# ── Uploaded images (user data, not source code) ───────────────────────────
+python-app/app/static/uploads/*
+!python-app/app/static/uploads/.gitkeep
+
+# ── ML model weights (large binary files) ─────────────────────────────────
+python-app/ml_model/models/*.h5
+python-app/ml_model/models/*.keras
+python-app/ml_model/data/
+
+# ── macOS system files ─────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── IDE / editor ──────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── Logs ──────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── pytest / coverage ─────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/

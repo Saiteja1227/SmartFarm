@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<!-- ── Hero Section ──────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-bg-circle hero-bg-circle--tr"></div>
+  <div class="hero-bg-circle hero-bg-circle--bl"></div>
+
+  <div class="hero-inner">
+    <div class="hero-badge">🤖 Powered by Deep Learning CNN</div>
+
+    <h1 class="hero-title">
+      AI-Driven Smart Urban<br>
+      <span class="hero-title-accent">Farming Resource</span> Optimization
+    </h1>
+
+    <p class="hero-subtitle">
+      Upload a plant leaf photo. Our AI instantly detects diseases,
+      assesses water stress, and provides actionable recommendations.
+      No sensors. No manual input. Just a photo.
+    </p>
+
+    <div class="hero-actions">
+      <a href="/upload" class="btn btn-hero-primary">
+        🌿 Analyze Your Plant Now →
+      </a>
+      <a href="/history" class="btn btn-hero-secondary">
+        View History
+      </a>
+    </div>
+
+    <!-- Stats row -->
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="stat-num">54K+</span><span class="stat-label">Training Images</span></div>
+      <div class="hero-stat"><span class="stat-num">38</span><span class="stat-label">Disease Classes</span></div>
+      <div class="hero-stat"><span class="stat-num">95%+</span><span class="stat-label">Accuracy</span></div>
+      <div class="hero-stat"><span class="stat-num">&lt;3s</span><span class="stat-label">Analysis Time</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How It Works ──────────────────────────────────────────────────────── -->
+<section class="section section--white">
+  <div class="container text-center">
+    <div class="section-badge">How It Works</div>
+    <h2 class="section-title">Three Simple Steps</h2>
+    <div class="steps-grid">
+      {% for step in [
+        ('01','Upload Photo','Take or upload a clear photo of a plant leaf using your phone or computer camera.','📸'),
+        ('02','AI Analysis','Our CNN model analyses the image for diseases and water stress in under 3 seconds.','🤖'),
+        ('03','Get Results','Receive a detailed report with diagnosis, confidence score, and smart recommendations.','📊'),
+      ] %}
+      <div class="step-card">
+        <div class="step-badge">Step {{ step[0] }}</div>
+        <div class="step-emoji">{{ step[3] }}</div>
+        <h3 class="step-title">{{ step[1] }}</h3>
+        <p class="step-desc">{{ step[2] }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Features Grid ─────────────────────────────────────────────────────── -->
+<section class="section section--gray">
+  <div class="container">
+    <div class="text-center mb-48">
+      <h2 class="section-title">Everything You Need</h2>
+      <p class="section-sub">Comprehensive AI-powered tools designed for modern farmers</p>
+    </div>
+    <div class="features-grid">
+      {% for f in [
+        ('⚡','Instant AI Analysis','Upload a leaf photo and get disease detection results in seconds using deep learning.','#f59e0b','#fffbeb'),
+        ('💧','Water Stress Detection','AI detects water stress from leaf appearance — no sensors or manual input required.','#3b82f6','#eff6ff'),
+        ('🛡️','Disease Prevention','Early disease detection powered by CNN trained on 54,000+ PlantVillage images.','#16a34a','#f0fdf4'),
+        ('📊','Resource Optimization','Get smart irrigation and fertilization recommendations tailored to your crop.','#8b5cf6','#f5f3ff'),
+        ('📱','Farmer-Friendly UI','Simple, visual interface with voice output — works for all literacy levels.','#ec4899','#fdf2f8'),
+        ('📈','Analytics Dashboard','Track farm health trends, disease history, and water usage over time.','#0891b2','#ecfeff'),
+      ] %}
+      <div class="feature-card">
+        <div class="feature-icon" style="background:{{ f[4] }}; font-size:22px;">{{ f[0] }}</div>
+        <h3 class="feature-title">{{ f[1] }}</h3>
+        <p class="feature-desc">{{ f[2] }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ── Benefits ──────────────────────────────────────────────────────────── -->
+<section class="section benefits-section">
+  <div class="container">
+    <div class="benefits-inner">
+      <div class="benefits-text">
+        <div class="badge-green">Why SmartFarm AI?</div>
+        <h2 class="benefits-title">Empowering Farmers with Accessible AI Technology</h2>
+        <p class="benefits-desc">
+          Traditional farming relies on expert knowledge and expensive sensors.
+          SmartFarm AI makes precision agriculture accessible to every farmer
+          through simple image analysis.
+        </p>
+        <a href="/upload" class="btn btn-primary">Try It Now →</a>
+      </div>
+      <div class="benefits-list">
+        {% for b in [
+          'No manual sensor data required',
+          'Works with any smartphone camera',
+          'Supports 38 plant-disease combinations',
+          'Voice output for easy accessibility',
+          'Real-time water stress assessment',
+          'Historical analysis tracking',
+        ] %}
+        <div class="benefit-item">
+          <span class="benefit-check">✅</span>
+          <span class="benefit-text">{{ b }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Banner ────────────────────────────────────────────────────────── -->
+<section class="cta-section">
+  <h2 class="cta-title">Ready to Optimize Your Farm?</h2>
+  <p class="cta-sub">Upload your first plant image and get instant AI-powered insights.</p>
+  <a href="/upload" class="btn btn-cta">🌿 Start Free Analysis</a>
+</section>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Analysis History{% endblock %}
+
+{% block content %}
+<div class="page-container page-container--wide">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Analysis History</h1>
+      <p id="historyCount" class="page-sub">Loading...</p>
+    </div>
+    <div class="page-header-actions">
+      <!-- Filter buttons -->
+      <button class="filter-btn active" data-filter="All"      onclick="setFilter(this,'All')">All</button>
+      <button class="filter-btn"        data-filter="Healthy"  onclick="setFilter(this,'Healthy')">Healthy</button>
+      <button class="filter-btn"        data-filter="Diseased" onclick="setFilter(this,'Diseased')">Diseased</button>
+      <button class="btn-refresh" onclick="fetchHistory(currentPage)">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingState" class="centered-state">
+    <div class="spinner spinner--lg"></div>
+    <p class="state-text">Loading history...</p>
+  </div>
+
+  <!-- Empty state -->
+  <div id="emptyState" class="empty-state" style="display:none;">
+    <div style="font-size:48px;margin-bottom:16px;">🌿</div>
+    <h3 class="empty-title">No records found</h3>
+    <p id="emptyMsg" class="empty-sub">Upload your first plant image to get started.</p>
+    <a href="/upload" class="btn btn-primary mt-24">Analyze a Plant</a>
+  </div>
+
+  <!-- Records grid -->
+  <div id="recordsGrid" class="history-grid" style="display:none;"></div>
+
+  <!-- Pagination -->
+  <div id="pagination" class="pagination" style="display:none;">
+    <button id="prevBtn" class="btn-page" onclick="fetchHistory(currentPage - 1)">← Prev</button>
+    <span id="pageInfo" class="page-info"></span>
+    <button id="nextBtn" class="btn-page" onclick="fetchHistory(currentPage + 1)">Next →</button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage   = 1;
+let totalPages    = 1;
+let allRecords    = [];
+let activeFilter  = 'All';
+
+const STATUS_BADGE = {
+  Healthy:  { bg:'#f0fdf4', color:'#16a34a' },
+  Diseased: { bg:'#fef2f2', color:'#dc2626' },
+  Unknown:  { bg:'#f9fafb', color:'#6b7280' },
+};
+const WATER_BADGE = {
+  Low:      { bg:'#eff6ff', color:'#2563eb' },
+  Moderate: { bg:'#fffbeb', color:'#d97706' },
+  High:     { bg:'#fff7ed', color:'#ea580c' },
+  Critical: { bg:'#fef2f2', color:'#dc2626' },
+};
+
+async function fetchHistory(page = 1) {
+  currentPage = page;
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('recordsGrid').style.display  = 'none';
+  document.getElementById('emptyState').style.display   = 'none';
+  document.getElementById('pagination').style.display   = 'none';
+
+  try {
+    const res  = await fetch(`/api/history/?page=${page}&limit=12`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message);
+
+    allRecords = data.data;
+    totalPages = data.pagination.pages;
+    document.getElementById('historyCount').textContent = `${data.pagination.total} total analyses recorded`;
+
+    renderRecords();
+    renderPagination(data.pagination);
+  } catch (err) {
+    showToast('Failed to load history', 'error');
+    document.getElementById('loadingState').style.display = 'none';
+  }
+}
+
+function renderRecords() {
+  document.getElementById('loadingState').style.display = 'none';
+  const filtered = activeFilter === 'All' ? allRecords : allRecords.filter(r => r.plant_status === activeFilter);
+
+  if (filtered.length === 0) {
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('emptyMsg').textContent =
+      activeFilter !== 'All' ? `No ${activeFilter.toLowerCase()} plants in history.` : 'Upload your first plant image to get started.';
+    return;
+  }
+
+  const grid = document.getElementById('recordsGrid');
+  grid.innerHTML = filtered.map(r => buildCard(r)).join('');
+  grid.style.display = 'grid';
+}
+
+function buildCard(r) {
+  const sb = STATUS_BADGE[r.plant_status] || STATUS_BADGE.Unknown;
+  const wb = WATER_BADGE[r.water_stress_level] || WATER_BADGE.Low;
+  const dateStr = new Date(r.created_at).toLocaleDateString();
+  const title = r.disease_name === 'None' ? 'Healthy Plant' : r.disease_name;
+  const barColor = r.confidence > 80 ? '#16a34a' : '#f59e0b';
+  const imgUrl = r.image_url;
+
+  return `
+  <div class="history-card" onclick="window.location='/results/${r._id}'">
+    <div class="history-card-img">
+      <img src="${imgUrl}" alt="Plant" onerror="this.parentElement.innerHTML='<div class=\\'img-fallback\\'>🌿</div>'" />
+    </div>
+    <div class="history-card-body">
+      <div class="badge-row">
+        <span class="badge" style="background:${sb.bg};color:${sb.color};">${r.plant_status === 'Healthy' ? '✅' : '⚠️'} ${r.plant_status}</span>
+        <span class="badge" style="background:${wb.bg};color:${wb.color};">💧 ${r.water_stress_level}</span>
+      </div>
+      <h4 class="card-item-title">${title}</h4>
+      <p class="card-item-sub">${r.image_name}</p>
+      <div class="mini-bar-wrap">
+        <div class="mini-bar-track">
+          <div class="mini-bar-fill" style="width:${r.confidence}%;background:${barColor};"></div>
+        </div>
+        <span class="mini-bar-pct">${r.confidence}% confidence</span>
+      </div>
+      <div class="card-item-footer">
+        <span class="card-date">🕐 ${dateStr}</span>
+        <div class="card-actions">
+          <button class="btn-icon btn-icon--green" title="View" onclick="event.stopPropagation();window.location='/results/${r._id}'">👁️</button>
+          <button class="btn-icon btn-icon--red"   title="Delete" onclick="event.stopPropagation();deleteRecord('${r._id}', this)">🗑️</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderPagination(p) {
+  if (p.pages <= 1) return;
+  document.getElementById('pagination').style.display = 'flex';
+  document.getElementById('pageInfo').textContent = `Page ${p.page} of ${p.pages}`;
+  document.getElementById('prevBtn').disabled = p.page === 1;
+  document.getElementById('nextBtn').disabled = p.page === p.pages;
+}
+
+function setFilter(btn, filter) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRecords();
+}
+
+async function deleteRecord(id, btn) {
+  if (!confirm('Delete this analysis record?')) return;
+  btn.disabled = true;
+  try {
+    const res  = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      allRecords = allRecords.filter(r => r._id !== id);
+      renderRecords();
+      showToast('Record deleted', 'success');
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (err) {
+    showToast('Failed to delete', 'error');
+    btn.disabled = false;
+  }
+}
+
+fetchHistory(1);
+</script>
+{% endblock %}

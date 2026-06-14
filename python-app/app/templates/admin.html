@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-container page-container--wide">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Admin Dashboard</h1>
+      <p class="page-sub">Farm health overview and AI analysis statistics</p>
+    </div>
+    <button class="btn-refresh" onclick="fetchStats()">🔄 Refresh</button>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingState" class="centered-state">
+    <div class="spinner spinner--lg"></div>
+    <p class="state-text">Loading dashboard...</p>
+  </div>
+
+  <!-- Error -->
+  <div id="errorState" class="centered-state" style="display:none;">
+    <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+    <h2 class="state-title">Dashboard Unavailable</h2>
+    <p id="errorMsg" class="state-sub"></p>
+    <button onclick="fetchStats()" class="btn btn-primary mt-24">Retry</button>
+  </div>
+
+  <!-- Dashboard content -->
+  <div id="dashContent" style="display:none;">
+
+    <!-- Stat Cards -->
+    <div class="stat-cards" id="statCards"></div>
+
+    <!-- Charts row 1 -->
+    <div class="charts-grid">
+      <!-- Health Pie -->
+      <div class="card">
+        <h3 class="card-title">🌿 Plant Health Distribution</h3>
+        <div id="healthPie" style="width:100%;height:240px;"></div>
+      </div>
+      <!-- Top Diseases Bar -->
+      <div class="card">
+        <h3 class="card-title">⚠️ Top Detected Diseases</h3>
+        <div id="diseasesBar" style="width:100%;height:240px;"></div>
+      </div>
+    </div>
+
+    <!-- Charts row 2 -->
+    <div class="charts-grid mt-20">
+      <!-- Water Stress Bar -->
+      <div class="card">
+        <h3 class="card-title">💧 Water Stress Distribution</h3>
+        <div id="waterBar" style="width:100%;height:240px;"></div>
+      </div>
+      <!-- Activity Line -->
+      <div class="card">
+        <h3 class="card-title">📈 Uploads — Last 7 Days</h3>
+        <div id="activityLine" style="width:100%;height:240px;"></div>
+      </div>
+    </div>
+
+    <!-- Disease Summary Table -->
+    <div class="card mt-20" id="summaryTable" style="display:none;">
+      <h3 class="card-title">📊 Disease Summary</h3>
+      <div style="overflow-x:auto;">
+        <table class="summary-table" id="diseaseTable">
+          <thead>
+            <tr>
+              <th>Rank</th><th>Disease Name</th><th>Count</th><th>Share</th>
+            </tr>
+          </thead>
+          <tbody id="diseaseTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Use Recharts (loaded in base.html via CDN) to render charts via React -->
+<script>
+const { createElement: h, useState, useEffect } = React;
+const {
+  PieChart, Pie, Cell,
+  BarChart, Bar,
+  LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend
+} = Recharts;
+
+const COLORS = ['#16a34a','#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899'];
+const WATER_COLORS = { Low:'#3b82f6', Moderate:'#f59e0b', High:'#f97316', Critical:'#ef4444' };
+
+let statsData = null;
+
+// ── Render charts using Recharts ──────────────────────────────────────────
+function renderCharts(data) {
+  // Health Pie
+  const healthData = [
+    { name:'Healthy',  value: data.healthyCount  },
+    { name:'Diseased', value: data.diseasedCount },
+  ];
+  if (data.totalUploads > 0) {
+    ReactDOM.render(
+      h(ResponsiveContainer, { width:'100%', height:240 },
+        h(PieChart, null,
+          h(Pie, { data: healthData, cx:'50%', cy:'50%', outerRadius:90, paddingAngle:4, dataKey:'value',
+                   label: ({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%` },
+            h(Cell, { key:0, fill:'#16a34a' }),
+            h(Cell, { key:1, fill:'#ef4444' })
+          ),
+          h(Tooltip, null)
+        )
+      ),
+      document.getElementById('healthPie')
+    );
+  } else {
+    document.getElementById('healthPie').innerHTML = '<p class="no-data">No data available yet</p>';
+  }
+
+  // Top Diseases Bar
+  if (data.topDiseases.length > 0) {
+    ReactDOM.render(
+      h(ResponsiveContainer, { width:'100%', height:240 },
+        h(BarChart, { data: data.topDiseases, margin:{ top:4, right:8, left:-20, bottom:0 } },
+          h(CartesianGrid, { strokeDasharray:'3 3', stroke:'#f3f4f6' }),
+          h(XAxis, { dataKey:'name', tick:{ fontSize:11 }, tickFormatter: v => v.length > 14 ? v.substring(0,14)+'…' : v }),
+          h(YAxis,  { tick:{ fontSize:11 } }),
+          h(Tooltip, null),
+          h(Bar, { dataKey:'count', name:'Count', radius:[6,6,0,0] },
+            ...data.topDiseases.map((_, i) => h(Cell, { key:i, fill: COLORS[i % COLORS.length] }))
+          )
+        )
+      ),
+      document.getElementById('diseasesBar')
+    );
+  } else {
+    document.getElementById('diseasesBar').innerHTML = '<p class="no-data">No disease data yet</p>';
+  }
+
+  // Water Stress Bar
+  if (data.waterStressDistribution.length > 0) {
+    ReactDOM.render(
+      h(ResponsiveContainer, { width:'100%', height:240 },
+        h(BarChart, { data: data.waterStressDistribution, margin:{ top:4, right:8, left:-20, bottom:0 } },
+          h(CartesianGrid, { strokeDasharray:'3 3', stroke:'#f3f4f6' }),
+          h(XAxis, { dataKey:'name', tick:{ fontSize:12 } }),
+          h(YAxis,  { tick:{ fontSize:11 } }),
+          h(Tooltip, null),
+          h(Bar, { dataKey:'count', name:'Count', radius:[6,6,0,0] },
+            ...data.waterStressDistribution.map((e, i) => h(Cell, { key:i, fill: WATER_COLORS[e.name] || COLORS[i] }))
+          )
+        )
+      ),
+      document.getElementById('waterBar')
+    );
+  } else {
+    document.getElementById('waterBar').innerHTML = '<p class="no-data">No water stress data yet</p>';
+  }
+
+  // Recent Activity Line
+  if (data.recentActivity.length > 0) {
+    ReactDOM.render(
+      h(ResponsiveContainer, { width:'100%', height:240 },
+        h(LineChart, { data: data.recentActivity, margin:{ top:4, right:8, left:-20, bottom:0 } },
+          h(CartesianGrid, { strokeDasharray:'3 3', stroke:'#f3f4f6' }),
+          h(XAxis, { dataKey:'date', tick:{ fontSize:11 }, tickFormatter: v => v.slice(5) }),
+          h(YAxis, { tick:{ fontSize:11 }, allowDecimals:false }),
+          h(Tooltip, null),
+          h(Line, { type:'monotone', dataKey:'count', name:'Uploads', stroke:'#16a34a',
+                    strokeWidth:2.5, dot:{ fill:'#16a34a', r:4 }, activeDot:{ r:6 } })
+        )
+      ),
+      document.getElementById('activityLine')
+    );
+  } else {
+    document.getElementById('activityLine').innerHTML = '<p class="no-data">No recent activity</p>';
+  }
+}
+
+// ── Stat cards ────────────────────────────────────────────────────────────
+function renderStatCards(data) {
+  const cards = [
+    { icon:'📤', value: data.totalUploads,     label:'Total Analyses',   sub:'All time',                          color:'#16a34a', bg:'#f0fdf4' },
+    { icon:'🌿', value: data.healthyCount,     label:'Healthy Plants',   sub:`${data.healthyPercentage}% of total`, color:'#16a34a', bg:'#f0fdf4' },
+    { icon:'⚠️', value: data.diseasedCount,    label:'Diseased Plants',  sub:`${data.diseasedPercentage}% of total`,color:'#ef4444', bg:'#fef2f2' },
+    { icon:'🎯', value: `${data.avgConfidence}%`, label:'Avg Confidence', sub:'Model accuracy indicator',          color:'#8b5cf6', bg:'#f5f3ff' },
+  ];
+  document.getElementById('statCards').innerHTML = cards.map(c => `
+    <div class="stat-card">
+      <div class="stat-icon" style="background:${c.bg};font-size:24px;">${c.icon}</div>
+      <div>
+        <div class="stat-value">${c.value}</div>
+        <div class="stat-label">${c.label}</div>
+        <div class="stat-sub">${c.sub}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Disease summary table ─────────────────────────────────────────────────
+function renderTable(data) {
+  if (!data.topDiseases.length) return;
+  document.getElementById('summaryTable').style.display = 'block';
+  document.getElementById('diseaseTbody').innerHTML = data.topDiseases.map((d, i) => {
+    const pct = data.diseasedCount ? Math.round((d.count / data.diseasedCount) * 100) : 0;
+    return `<tr>
+      <td><span class="rank-badge" style="background:${COLORS[i]}22;color:${COLORS[i]};">#${i+1}</span></td>
+      <td style="font-weight:600;color:#111827;">${d.name}</td>
+      <td>${d.count}</td>
+      <td>
+        <div class="share-bar-wrap">
+          <div class="share-bar-track"><div class="share-bar-fill" style="width:${pct}%;background:${COLORS[i]};"></div></div>
+          <span class="share-pct">${pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function fetchStats() {
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('dashContent').style.display  = 'none';
+  document.getElementById('errorState').style.display   = 'none';
+
+  try {
+    const res  = await fetch('/api/stats/');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Failed');
+    statsData = data.data;
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('dashContent').style.display  = 'block';
+
+    renderStatCards(statsData);
+    renderCharts(statsData);
+    renderTable(statsData);
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display   = 'flex';
+    document.getElementById('errorMsg').textContent = err.message || 'Cannot reach server. Make sure the backend is running.';
+  }
+}
+
+fetchStats();
+</script>
+{% endblock %}

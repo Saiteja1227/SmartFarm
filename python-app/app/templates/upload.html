@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Analyze Plant{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:800px;">
+
+  <!-- Header -->
+  <div class="text-center mb-40">
+    <div class="badge-outline-green">🌿 AI Plant Analysis</div>
+    <h1 class="page-title">Upload a Plant Leaf Image</h1>
+    <p class="page-sub">Take a clear photo of the plant leaf. Our AI will detect diseases and assess water stress instantly.</p>
+  </div>
+
+  <!-- Tips -->
+  <div class="info-box mb-28">
+    <span class="info-icon">📷</span>
+    <div>
+      <p class="info-title">Tips for best results</p>
+      <ul class="info-list">
+        <li>Ensure the leaf fills most of the frame</li>
+        <li>Good lighting — avoid shadows on the leaf</li>
+        <li>Take photo in focus (not blurry)</li>
+        <li>Include visible symptoms if present</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Upload Form -->
+  <form id="uploadForm" enctype="multipart/form-data">
+
+    <!-- Drop Zone (shown when no file selected) -->
+    <div id="dropZone" class="dropzone">
+      <input type="file" id="fileInput" name="image" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;" />
+      <div id="dropIcon" class="dropzone-icon">☁️</div>
+      <p class="dropzone-title">Drag &amp; drop your plant image here</p>
+      <p class="dropzone-sub">or click to browse files</p>
+      <button type="button" id="browseBtn" class="btn btn-primary" style="margin-top:12px;">📂 Choose Image</button>
+      <p class="dropzone-hint">Supports JPEG, PNG, WEBP • Max 10MB</p>
+    </div>
+
+    <!-- Preview (shown after file selected) -->
+    <div id="previewBox" class="preview-box" style="display:none;">
+      <div class="preview-header">
+        <span class="preview-ready">✅ Image Ready</span>
+        <button type="button" id="removeBtn" class="btn-remove">✕ Remove</button>
+      </div>
+      <div class="preview-img-wrap">
+        <img id="previewImg" src="" alt="Plant leaf preview" class="preview-img" />
+      </div>
+      <div class="preview-meta">
+        <div>
+          <p id="fileName" class="file-name"></p>
+          <p id="fileSize" class="file-size"></p>
+        </div>
+        <button type="button" id="changBtn" class="btn-outline-sm">Choose Different</button>
+      </div>
+    </div>
+
+    <!-- Error message -->
+    <div id="errorBox" class="error-box" style="display:none;">
+      <span>⚠️</span>
+      <span id="errorMsg"></span>
+    </div>
+
+    <!-- Analyze button -->
+    <button type="submit" id="analyzeBtn" class="btn btn-analyze" disabled>
+      🌿 Analyze Plant Health
+    </button>
+  </form>
+
+  <!-- Loading overlay -->
+  <div id="loadingBox" class="loading-box" style="display:none;">
+    <div class="spinner"></div>
+    <p class="loading-title">AI is analyzing your plant...</p>
+    <p class="loading-sub">Running CNN disease detection and water stress analysis</p>
+    <div class="loading-tags">
+      <span class="tag-green">✓ Disease Detection</span>
+      <span class="tag-green">✓ Water Stress</span>
+      <span class="tag-green">✓ Recommendations</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone   = document.getElementById('dropZone');
+const fileInput  = document.getElementById('fileInput');
+const previewBox = document.getElementById('previewBox');
+const previewImg = document.getElementById('previewImg');
+const removeBtn  = document.getElementById('removeBtn');
+const changBtn   = document.getElementById('changBtn');
+const browseBtn  = document.getElementById('browseBtn');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const errorBox   = document.getElementById('errorBox');
+const errorMsg   = document.getElementById('errorMsg');
+const loadingBox = document.getElementById('loadingBox');
+const uploadForm = document.getElementById('uploadForm');
+const fileName   = document.getElementById('fileName');
+const fileSize   = document.getElementById('fileSize');
+
+const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+
+function showError(msg) {
+  errorMsg.textContent = msg;
+  errorBox.style.display = 'flex';
+}
+function clearError() {
+  errorBox.style.display = 'none';
+}
+
+function loadFile(file) {
+  clearError();
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showError('Invalid file type. Please upload a JPEG, PNG, or WEBP image.'); return; }
+  if (file.size > MAX_SIZE)            { showError('File is too large. Maximum size is 10 MB.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    previewImg.src = e.target.result;
+    fileName.textContent = file.name;
+    fileSize.textContent = `${(file.size / 1024).toFixed(1)} KB • ${file.type}`;
+    dropZone.style.display  = 'none';
+    previewBox.style.display = 'block';
+    analyzeBtn.disabled = false;
+    analyzeBtn.classList.add('btn-analyze--active');
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetUpload() {
+  fileInput.value = '';
+  previewImg.src  = '';
+  previewBox.style.display = 'none';
+  dropZone.style.display   = 'block';
+  analyzeBtn.disabled = true;
+  analyzeBtn.classList.remove('btn-analyze--active');
+  clearError();
+}
+
+browseBtn.addEventListener('click', () => fileInput.click());
+changBtn.addEventListener('click',  () => { resetUpload(); fileInput.click(); });
+removeBtn.addEventListener('click', resetUpload);
+fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
+
+// Drag & drop
+dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('dropzone--active'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('dropzone--active'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dropzone--active');
+  const file = e.dataTransfer.files[0];
+  // Manually assign to input (for form submission)
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fileInput.files = dt.files;
+  loadFile(file);
+});
+dropZone.addEventListener('click', (e) => {
+  if (e.target !== browseBtn) fileInput.click();
+});
+
+// Form submission
+uploadForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!fileInput.files[0]) { showError('Please upload a plant leaf image first.'); return; }
+
+  analyzeBtn.disabled = true;
+  analyzeBtn.innerHTML = '<span class="spinner-inline"></span> Analyzing with AI... Please wait';
+  loadingBox.style.display = 'block';
+  clearError();
+
+  const formData = new FormData();
+  formData.append('image', fileInput.files[0]);
+
+  try {
+    const res  = await fetch('/api/analyze/', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Analysis complete! ✅', 'success');
+      window.location.href = `/results/${data.data._id}`;
+    } else {
+      throw new Error(data.message || 'Analysis failed');
+    }
+  } catch (err) {
+    const msg = err.message || 'Analysis failed. Please try again.';
+    showError(msg);
+    showToast(msg, 'error');
+    analyzeBtn.disabled = false;
+    analyzeBtn.innerHTML = '🌿 Analyze Plant Health';
+    loadingBox.style.display = 'none';
+  }
+});
+</script>
+{% endblock %}

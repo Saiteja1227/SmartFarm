@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#16a34a" />
+  <title>{% block title %}SmartFarm{% endblock %} — AI Urban Farming</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="navbar-brand">
+      <div class="brand-icon">🌿</div>
+      <div>
+        <span class="brand-name">SmartFarm AI</span>
+        <span class="brand-sub">Urban Farming Assistant</span>
+      </div>
+    </a>
+
+    <ul class="nav-links desktop-nav" id="desktopNav">
+      <li><a href="/"        class="nav-link {% if request.path == '/' %}active{% endif %}">🏠 Home</a></li>
+      <li><a href="/upload"  class="nav-link {% if request.path == '/upload' %}active{% endif %}">📷 Analyse</a></li>
+      <li><a href="/history" class="nav-link {% if request.path == '/history' %}active{% endif %}">🕐 History</a></li>
+      <li><a href="/admin"   class="nav-link {% if request.path == '/admin' %}active{% endif %}">📊 Dashboard</a></li>
+    </ul>
+
+    <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu">☰</button>
+  </div>
+
+  <!-- Mobile menu -->
+  <div class="mobile-menu" id="mobileMenu" style="display:none;">
+    <a href="/"        class="nav-link {% if request.path == '/' %}active{% endif %}">🏠 Home</a>
+    <a href="/upload"  class="nav-link {% if request.path == '/upload' %}active{% endif %}">📷 Analyse</a>
+    <a href="/history" class="nav-link {% if request.path == '/history' %}active{% endif %}">🕐 History</a>
+    <a href="/admin"   class="nav-link {% if request.path == '/admin' %}active{% endif %}">📊 Dashboard</a>
+  </div>
+</nav>
+
+<!-- ── Toast container ─────────────────────────────────────────────────── -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- ── Page content ───────────────────────────────────────────────────── -->
+<main class="main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────── -->
+<footer class="site-footer">
+  🌿 SmartFarm AI &nbsp;•&nbsp; AI-Driven Urban Farming Resource Optimisation &nbsp;•&nbsp; 2024
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

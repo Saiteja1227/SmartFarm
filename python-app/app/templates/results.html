@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Analysis Results{% endblock %}
+
+{% block content %}
+<div class="page-container" id="resultsPage">
+
+  <!-- Loading state -->
+  <div id="loadingState" class="centered-state">
+    <div class="spinner spinner--lg"></div>
+    <p class="state-text">Loading results...</p>
+  </div>
+
+  <!-- Error state -->
+  <div id="errorState" class="centered-state" style="display:none;">
+    <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+    <h2 class="state-title">Oops!</h2>
+    <p id="errorMsg" class="state-sub">Record not found.</p>
+    <a href="/upload" class="btn btn-primary mt-24">Try New Analysis</a>
+  </div>
+
+  <!-- Results content -->
+  <div id="resultsContent" style="display:none;">
+
+    <!-- Header row -->
+    <div class="results-header">
+      <a href="/upload" class="btn-back">← New Analysis</a>
+      <div class="results-header-actions">
+        <button id="speakBtn" class="btn-speak">🔊 Read Aloud</button>
+        <a href="/history" class="btn-back">🕐 History</a>
+      </div>
+    </div>
+
+    <h1 class="page-title">Analysis Results</h1>
+    <p id="resultsMeta" class="results-meta"></p>
+
+    <!-- Main grid: image + status + disease -->
+    <div class="results-grid">
+
+      <!-- Plant Image -->
+      <div class="card results-img-card">
+        <h3 class="card-title">🌿 Plant Image</h3>
+        <img id="plantImg" src="" alt="Analysed plant leaf" class="results-plant-img"
+             onerror="this.style.display='none'; document.getElementById('imgFallback').style.display='flex';" />
+        <div id="imgFallback" class="img-fallback" style="display:none;">🌿 Preview unavailable</div>
+      </div>
+
+      <!-- Plant Status -->
+      <div class="card" id="statusCard">
+        <h3 class="card-title">Plant Status</h3>
+        <div id="statusEmoji" style="font-size:40px;margin:8px 0;"></div>
+        <div id="statusText" class="status-text"></div>
+        <div id="confidenceBadge" class="confidence-badge"></div>
+      </div>
+
+      <!-- Disease Detection -->
+      <div class="card">
+        <h3 class="card-title">⚠️ Disease Detection</h3>
+        <div id="diseaseText" class="disease-text"></div>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar-labels">
+            <span>Confidence</span>
+            <span id="confPct"></span>
+          </div>
+          <div class="confidence-bar-track">
+            <div id="confidenceBar" class="confidence-bar-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Second row: water + recommendation -->
+    <div class="results-grid results-grid--2">
+
+      <!-- Water Stress -->
+      <div class="card" id="waterCard">
+        <h3 class="card-title">💧 Water Stress Level</h3>
+        <div id="waterText" class="water-text"></div>
+        <div class="water-bar-track">
+          <div id="waterBar" class="water-bar-fill"></div>
+        </div>
+        <div class="water-labels">
+          <span>Low</span><span>Moderate</span><span>High</span><span>Critical</span>
+        </div>
+      </div>
+
+      <!-- Watering Recommendation -->
+      <div class="card">
+        <h3 class="card-title">💧 Watering Recommendation</h3>
+        <p id="recommendation" class="recommendation-text"></p>
+      </div>
+    </div>
+
+    <!-- Visible Symptoms detected by visual analyser -->
+    <div class="card mb-20" id="symptomsCard" style="display:none; border-left:4px solid #f59e0b; background:#fffbeb;">
+      <h3 class="card-title" style="color:#92400e;">
+        🔍 Visible Symptoms Detected
+      </h3>
+      <ul id="symptomsList" style="padding-left:20px; color:#78350f; font-size:15px; line-height:2;"></ul>
+    </div>
+
+    <!-- Prediction Reason -->
+    <div class="card mb-20" id="reasonCard" style="display:none; background:#f0f9ff; border-left:4px solid #0ea5e9;">
+      <h3 class="card-title" style="color:#0c4a6e;">🧠 Why This Prediction?</h3>
+      <p id="predictionReason" style="color:#0369a1; font-size:14px; line-height:1.7;"></p>
+    </div>
+
+    <!-- Resource Optimisation Tips -->
+    <div class="card card--green mb-20" id="resourceCard" style="display:none;">
+      <h3 class="card-title" style="color:#14532d;">👍 Resource Optimisation Tips</h3>
+      <p id="resourceText" class="resource-text"></p>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="results-actions">
+      <a href="/upload" class="btn btn-primary">🔄 Analyse Another Plant</a>
+      <a href="/history" class="btn btn-secondary">🕐 View Full History</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RECORD_ID = "{{ record_id }}";
+
+const STATUS_CONFIG = {
+  Healthy:  { emoji:'✅', color:'#16a34a', bg:'#f0fdf4', border:'#bbf7d0' },
+  Diseased: { emoji:'⚠️', color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
+  Unknown:  { emoji:'❓', color:'#d97706', bg:'#fffbeb', border:'#fde68a' },
+};
+const WATER_CONFIG = {
+  Low:      { color:'#2563eb', bg:'#eff6ff', border:'#bfdbfe', bar:20  },
+  Moderate: { color:'#d97706', bg:'#fffbeb', border:'#fde68a', bar:50  },
+  High:     { color:'#ea580c', bg:'#fff7ed', border:'#fdba74', bar:75  },
+  Critical: { color:'#dc2626', bg:'#fef2f2', border:'#fecaca', bar:100 },
+};
+
+let analysisData = null;
+let speaking     = false;
+
+async function loadResults() {
+  try {
+    const res  = await fetch(`/api/history/${RECORD_ID}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Not found');
+    analysisData = json.data;
+    renderResults(json.data);
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display   = 'flex';
+    document.getElementById('errorMsg').textContent       = err.message || 'Failed to load results.';
+  }
+}
+
+function renderResults(d) {
+  document.getElementById('loadingState').style.display  = 'none';
+  document.getElementById('resultsContent').style.display = 'block';
+
+  // Meta
+  const dt = new Date(d.created_at).toLocaleString();
+  document.getElementById('resultsMeta').textContent = `🕐 ${dt} • ${d.image_name}`;
+
+  // Image
+  document.getElementById('plantImg').src = d.image_url;
+
+  // Status card
+  const sCfg     = STATUS_CONFIG[d.plant_status] || STATUS_CONFIG.Unknown;
+  const statusCard = document.getElementById('statusCard');
+  statusCard.style.background  = sCfg.bg;
+  statusCard.style.borderColor = sCfg.border;
+  document.getElementById('statusEmoji').textContent         = sCfg.emoji;
+  document.getElementById('statusText').textContent          = d.plant_status;
+  document.getElementById('statusText').style.color          = sCfg.color;
+  document.getElementById('confidenceBadge').textContent     = `${d.confidence}% confidence`;
+  document.getElementById('confidenceBadge').style.background = sCfg.color;
+
+  // Disease
+  const isHealthy  = d.disease_name === 'None';
+  const isUnknown  = d.disease_name === 'Unable to Identify';
+  document.getElementById('diseaseText').textContent = isHealthy  ? '✅ No Disease' :
+                                                       isUnknown  ? '❓ Unable to Identify' :
+                                                                    `⚠️ ${d.disease_name}`;
+  document.getElementById('diseaseText').style.color  = isHealthy ? '#16a34a' :
+                                                        isUnknown  ? '#d97706' : '#dc2626';
+  document.getElementById('confPct').textContent = `${d.confidence}%`;
+  const bar = document.getElementById('confidenceBar');
+  bar.style.width      = `${d.confidence}%`;
+  bar.style.background = d.confidence > 75 ? '#16a34a' : d.confidence > 55 ? '#f59e0b' : '#ef4444';
+
+  // Water stress
+  const wCfg = WATER_CONFIG[d.water_stress_level] || WATER_CONFIG.Low;
+  const waterCard = document.getElementById('waterCard');
+  waterCard.style.background   = wCfg.bg;
+  waterCard.style.borderColor  = wCfg.border;
+  document.getElementById('waterText').textContent = d.water_stress_level;
+  document.getElementById('waterText').style.color = wCfg.color;
+  const wb = document.getElementById('waterBar');
+  wb.style.width      = `${wCfg.bar}%`;
+  wb.style.background = wCfg.color;
+
+  // Recommendation
+  document.getElementById('recommendation').textContent = d.recommendation;
+
+  // Visible symptoms (new field)
+  const symptoms = d.visible_symptoms || [];
+  if (symptoms.length > 0) {
+    const card = document.getElementById('symptomsCard');
+    const list = document.getElementById('symptomsList');
+    card.style.display = 'block';
+    list.innerHTML = symptoms.map(s => `<li>🔸 ${s}</li>`).join('');
+  }
+
+  // Prediction reason (new field)
+  const reason = d.prediction_reason || '';
+  if (reason) {
+    document.getElementById('reasonCard').style.display   = 'block';
+    document.getElementById('predictionReason').textContent = reason;
+  }
+
+  // Resource optimisation
+  if (d.resource_optimization) {
+    document.getElementById('resourceCard').style.display = 'block';
+    document.getElementById('resourceText').textContent   = d.resource_optimization;
+  }
+}
+
+// ── Voice output (Web Speech API) ─────────────────────────────────────────
+const speakBtn = document.getElementById('speakBtn');
+speakBtn.addEventListener('click', () => {
+  if (!analysisData) return;
+  if (!('speechSynthesis' in window)) {
+    showToast('Voice not supported in this browser.', 'error');
+    return;
+  }
+  if (speaking) {
+    window.speechSynthesis.cancel();
+    speaking = false;
+    speakBtn.textContent = '🔊 Read Aloud';
+    speakBtn.classList.remove('btn-speak--active');
+    return;
+  }
+
+  const d    = analysisData;
+  const syms = (d.visible_symptoms || []).join(', ') || 'none';
+  const text = [
+    'Plant health analysis results.',
+    `Plant status: ${d.plant_status}.`,
+    d.disease_name !== 'None' ? `Disease detected: ${d.disease_name}.` : 'No disease detected.',
+    `Confidence: ${d.confidence} percent.`,
+    `Water stress level: ${d.water_stress_level}.`,
+    syms !== 'none' ? `Visible symptoms: ${syms}.` : '',
+    `Recommendation: ${d.recommendation}`,
+  ].filter(Boolean).join(' ');
+
+  const utter  = new SpeechSynthesisUtterance(text);
+  utter.lang   = 'en-US';
+  utter.rate   = 0.85;
+  utter.onend  = () => { speaking = false; speakBtn.textContent = '🔊 Read Aloud'; speakBtn.classList.remove('btn-speak--active'); };
+  utter.onerror = () => { speaking = false; };
+
+  window.speechSynthesis.speak(utter);
+  speaking = true;
+  speakBtn.textContent = '🔇 Stop';
+  speakBtn.classList.add('btn-speak--active');
+});
+
+loadResults();
+</script>
+{% endblock %}
