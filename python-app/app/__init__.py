@@ -15,6 +15,7 @@ from app.extensions import mongo
 
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    app.config["MONGO_AVAILABLE"] = False
 
     # ── Core config ────────────────────────────────────────────────────────
     app.config["SECRET_KEY"]         = os.getenv("SECRET_KEY", "smartfarm-dev-key")
@@ -23,18 +24,17 @@ def create_app():
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     # ── MongoDB Atlas ──────────────────────────────────────────────────────
-    raw_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/smartfarming")
-    if "mongodb+srv" in raw_uri and "tlsCAFile" not in raw_uri:
-        sep = "&" if "?" in raw_uri else "?"
-        raw_uri = f"{raw_uri}{sep}tlsCAFile={certifi.where()}"
-    app.config["MONGO_URI"] = raw_uri
+    raw_uri = os.getenv("MONGODB_URI")
+    if raw_uri and not raw_uri.startswith(("mongodb://localhost", "mongodb://127.0.0.1", "mongodb://[::1]", "mongodb://0.0.0.0")):
+        if "mongodb+srv" in raw_uri and "tlsCAFile" not in raw_uri:
+            sep = "&" if "?" in raw_uri else "?"
+            raw_uri = f"{raw_uri}{sep}tlsCAFile={certifi.where()}"
 
-    # ── Initialise extensions ──────────────────────────────────────────────
-    mongo.init_app(app)
-
-    # ── Ensure indexes ─────────────────────────────────────────────────────
-    with app.app_context():
-        _create_indexes()
+        app.config["MONGO_URI"] = raw_uri
+        mongo.init_app(app)
+        app.config["MONGO_AVAILABLE"] = True
+    else:
+        app.logger.info("MONGODB_URI not set, using local fallback store.")
 
     # ── Register blueprints ────────────────────────────────────────────────
     from app.routes.main    import main_bp

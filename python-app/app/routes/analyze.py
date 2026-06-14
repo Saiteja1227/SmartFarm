@@ -13,6 +13,7 @@ from werkzeug.utils import secure_filename
 
 from app.extensions import mongo
 from app.models.analysis import build_document, serialize
+from app.storage import save_local_analysis
 
 analyze_bp = Blueprint("analyze", __name__)
 
@@ -112,8 +113,15 @@ def analyze():
             visible_symptoms=visible_symptoms,
             prediction_reason=pred_reason,
         )
-        result    = mongo.db.analyses.insert_one(doc)
-        doc["_id"] = str(result.inserted_id)
+        if current_app.config.get("MONGO_AVAILABLE", False):
+            try:
+                result = mongo.db.analyses.insert_one(doc)
+                doc["_id"] = str(result.inserted_id)
+            except Exception as db_exc:
+                current_app.logger.warning("Mongo save unavailable (%s). Using local fallback store.", db_exc)
+                doc = save_local_analysis(doc)
+        else:
+            doc = save_local_analysis(doc)
 
         return jsonify({"success": True, "message": "Analysis complete", "data": serialize(doc)}), 200
 
