@@ -42,8 +42,63 @@ def _build_preview_data_url(file_path: str) -> str:
         return ""
 
 
+def _local_healthy_precheck(file_path: str) -> dict | None:
+    """Return a direct Healthy prediction when the image is clearly healthy."""
+    try:
+        import sys
+
+        ml_model_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "ml_model")
+        )
+        if ml_model_dir not in sys.path:
+            sys.path.insert(0, ml_model_dir)
+
+        from server import analyse_visual_symptoms, _strong_healthy_signal
+
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+
+        symptoms_data = analyse_visual_symptoms(image_bytes)
+        if not _strong_healthy_signal(
+            symptoms_data["healthy_pixel_ratio"],
+            symptoms_data["disease_pixel_ratio"],
+            symptoms_data["severity_score"],
+            symptoms_data["symptoms"],
+        ):
+            return None
+
+        water = "Low"
+        return {
+            "plantStatus": "Healthy",
+            "diseaseName": "None",
+            "confidence": 95.0,
+            "waterStress": water,
+            "recommendation": "No irrigation required today. Soil moisture is adequate.",
+            "resourceOptimization": "Maintain current schedule. Mulch around the plant to retain moisture.",
+            "visibleSymptoms": symptoms_data["symptoms"],
+            "predictionReason": "Strong healthy visual signal detected locally before model inference.",
+        }
+    except Exception as exc:
+        current_app.logger.warning("Healthy precheck unavailable (%s). Falling back to model call.", exc)
+        return None
+
+
+def _service_unavailable_prediction() -> dict:
+    return {
+        "plantStatus": "Unknown",
+        "diseaseName": "Unable to Identify",
+        "confidence": 0.0,
+        "waterStress": "Moderate",
+        "recommendation": "Analysis service unavailable. Please try again once the model service is online.",
+        "resourceOptimization": "",
+        "visibleSymptoms": [],
+        "predictionReason": "Model service unavailable and demo fallback is disabled.",
+    }
+
+
 def _call_ml_model(file_path: str, file_name: str) -> dict:
     ml_url = os.getenv("ML_MODEL_URL", "http://localhost:8000")
+    allow_demo_fallback = os.getenv("ALLOW_DEMO_FALLBACK", "false").lower() == "true"
     try:
         with open(file_path, "rb") as f:
             response = requests.post(
@@ -54,8 +109,12 @@ def _call_ml_model(file_path: str, file_name: str) -> dict:
         response.raise_for_status()
         return response.json()
     except Exception as exc:
-        current_app.logger.warning("ML model unreachable (%s). Using local fallback.", exc)
-        return _local_visual_fallback(file_path)
+        if allow_demo_fallback:
+            current_app.logger.warning("ML model unreachable (%s). Using local fallback.", exc)
+            return _local_visual_fallback(file_path)
+
+        current_app.logger.warning("ML model unreachable (%s). Demo fallback disabled.", exc)
+        return _service_unavailable_prediction()
 
 
 def _local_visual_fallback(file_path: str) -> dict:
@@ -109,7 +168,7 @@ def analyze():
 
         image_url  = f"/static/uploads/{safe_name}"
         image_preview = _build_preview_data_url(save_path)
-        prediction = _call_ml_model(save_path, safe_name)
+        prediction = _local_healthy_precheck(save_path) or _call_ml_model(save_path, safe_name)
 
         plant_status     = prediction.get("plantStatus")   or prediction.get("plant_status")   or "Unknown"
         disease_name     = prediction.get("diseaseName")   or prediction.get("disease_name")   or "None"

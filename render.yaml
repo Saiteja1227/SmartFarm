@@ -14,7 +14,9 @@ services:
       - key: MONGODB_URI
         sync: false          # set this in Render dashboard — keep secret
       - key: ML_MODEL_URL
-        value: http://localhost:8000
+        value: http://localhost:8000  # replace with the deployed ML service URL if you add one
+      - key: ALLOW_DEMO_FALLBACK
+        value: "false"
       - key: MAX_CONTENT_LENGTH
         value: "10485760"
       - key: SECRET_KEY
