@@ -4,6 +4,4 @@ python-multipart==0.0.9
 Pillow==10.4.0
 numpy==1.26.4
 pydantic==2.7.4
-# Uncomment one of these for real CNN inference:
-# tensorflow-cpu==2.16.1   # CPU-only
-# tensorflow==2.16.1       # GPU
+tensorflow-cpu==2.16.1

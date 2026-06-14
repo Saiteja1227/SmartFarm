@@ -37,7 +37,8 @@ except ImportError:
 
 # ── Config ───────────────────────────────────────────────────────────────────
 IMG_SIZE = (224, 224)
-MODEL_PATH = "models/plant_disease_model.h5"
+MODEL_PATH = os.getenv("MODEL_PATH", "models/plant_disease_model.h5")
+REQUIRE_REAL_MODEL = os.getenv("REQUIRE_REAL_MODEL", "false").lower() == "true"
 DEMO_MODE = not TF_AVAILABLE or not os.path.exists(MODEL_PATH)
 
 # Minimum confidence to trust a Healthy prediction
@@ -620,6 +621,14 @@ model = None
 @app.on_event("startup")
 def load_model():
     global model, DEMO_MODE
+    if REQUIRE_REAL_MODEL and not TF_AVAILABLE:
+        raise RuntimeError("TensorFlow is required for real model inference but is not installed.")
+
+    if REQUIRE_REAL_MODEL and not os.path.exists(MODEL_PATH):
+        raise RuntimeError(
+            f"Required model artifact not found at {MODEL_PATH}. Deploy a trained .h5 file or set REQUIRE_REAL_MODEL=false for demo mode."
+        )
+
     if TF_AVAILABLE and os.path.exists(MODEL_PATH):
         try:
             model = tf.keras.models.load_model(MODEL_PATH)
@@ -631,6 +640,10 @@ def load_model():
             print(f"⚠️  Failed to load model: {e}. Falling back to demo mode.")
             DEMO_MODE = True
     else:
+        if REQUIRE_REAL_MODEL:
+            raise RuntimeError(
+                f"Real model mode requested but no trained model is available at {MODEL_PATH}."
+            )
         DEMO_MODE = True
         print("ℹ️  Running in DEMO mode — visual symptom analyser active.")
 

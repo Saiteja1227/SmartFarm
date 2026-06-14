@@ -42,6 +42,18 @@ def _build_preview_data_url(file_path: str) -> str:
         return ""
 
 
+def _resolve_ml_model_url() -> str:
+    explicit_url = os.getenv("ML_MODEL_URL", "").strip()
+    if explicit_url:
+        return explicit_url.rstrip("/")
+
+    hostport = os.getenv("ML_MODEL_HOSTPORT", "").strip()
+    if hostport:
+        return f"http://{hostport}"
+
+    return "http://localhost:8000"
+
+
 def _local_healthy_precheck(file_path: str) -> dict | None:
     """Return a direct Healthy prediction when the image is clearly healthy."""
     try:
@@ -97,7 +109,7 @@ def _service_unavailable_prediction() -> dict:
 
 
 def _call_ml_model(file_path: str, file_name: str) -> dict:
-    ml_url = os.getenv("ML_MODEL_URL", "http://localhost:8000")
+    ml_url = _resolve_ml_model_url()
     allow_demo_fallback = os.getenv("ALLOW_DEMO_FALLBACK", "false").lower() == "true"
     try:
         with open(file_path, "rb") as f:
