@@ -174,8 +174,26 @@ uploadForm.addEventListener('submit', async (e) => {
   formData.append('image', fileInput.files[0]);
 
   try {
-    const res  = await fetch('/api/analyze/', { method: 'POST', body: formData });
-    const data = await res.json();
+    const res = await fetch('/api/analyze/', {
+      method: 'POST',
+      body: formData,
+      headers: { 'Accept': 'application/json' },
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const payload = await res.text();
+    let data;
+
+    if (contentType.includes('application/json')) {
+      data = JSON.parse(payload);
+    } else {
+      throw new Error(payload.includes('<html') ? 'Server returned an HTML error page instead of JSON.' : payload || 'Analysis failed');
+    }
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Analysis failed');
+    }
+
     if (data.success) {
       showToast('Analysis complete! ✅', 'success');
       window.location.href = `/results/${data.data._id}`;
