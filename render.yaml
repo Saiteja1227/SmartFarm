@@ -13,7 +13,7 @@ services:
         value: "0"
       - key: MONGODB_URI
         sync: false          # set this in Render dashboard — keep secret
-      - key: ML_MODEL_HOSTPORT
+      - key: ML_MODEL_URL
         fromService:
           name: smartfarm-ml
           type: pserv

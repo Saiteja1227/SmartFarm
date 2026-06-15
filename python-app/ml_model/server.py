@@ -19,6 +19,8 @@ Fixes applied (v2):
 import io
 import os
 import random
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 from typing import Optional
@@ -36,8 +38,9 @@ except ImportError:
     print("⚠️  TensorFlow not installed. Running in DEMO mode.")
 
 # ── Config ───────────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
 IMG_SIZE = (224, 224)
-MODEL_PATH = os.getenv("MODEL_PATH", "models/plant_disease_model.h5")
+MODEL_PATH = os.getenv("MODEL_PATH", str(BASE_DIR / "models" / "plant_disease_model.h5"))
 REQUIRE_REAL_MODEL = os.getenv("REQUIRE_REAL_MODEL", "false").lower() == "true"
 DEMO_MODE = not TF_AVAILABLE or not os.path.exists(MODEL_PATH)
 
@@ -621,13 +624,22 @@ model = None
 @app.on_event("startup")
 def load_model():
     global model, DEMO_MODE
-    if REQUIRE_REAL_MODEL and not TF_AVAILABLE:
-        raise RuntimeError("TensorFlow is required for real model inference but is not installed.")
+    model = None
 
-    if REQUIRE_REAL_MODEL and not os.path.exists(MODEL_PATH):
-        raise RuntimeError(
-            f"Required model artifact not found at {MODEL_PATH}. Deploy a trained .h5 file or set REQUIRE_REAL_MODEL=false for demo mode."
-        )
+    if not TF_AVAILABLE:
+        DEMO_MODE = True
+        print("⚠️  TensorFlow not installed. Running in DEMO mode.")
+        return
+
+    if not os.path.exists(MODEL_PATH):
+        DEMO_MODE = True
+        if REQUIRE_REAL_MODEL:
+            print(
+                f"⚠️  Required model artifact not found at {MODEL_PATH}. Running in DEMO mode until the trained file is deployed."
+            )
+        else:
+            print(f"ℹ️  Model artifact not found at {MODEL_PATH}. Running in DEMO mode.")
+        return
 
     if TF_AVAILABLE and os.path.exists(MODEL_PATH):
         try:
@@ -638,13 +650,10 @@ def load_model():
             print(f"   • Minimum confidence threshold : {MIN_CONFIDENCE_THRESHOLD}%")
         except Exception as e:
             print(f"⚠️  Failed to load model: {e}. Falling back to demo mode.")
+            model = None
             DEMO_MODE = True
-    else:
-        if REQUIRE_REAL_MODEL:
-            raise RuntimeError(
-                f"Real model mode requested but no trained model is available at {MODEL_PATH}."
-            )
-        DEMO_MODE = True
+    DEMO_MODE = True if model is None else False
+    if DEMO_MODE:
         print("ℹ️  Running in DEMO mode — visual symptom analyser active.")
 
 
@@ -691,6 +700,8 @@ def health():
         "version": "2.0.0",
         "mode": "demo" if DEMO_MODE else "production",
         "model_loaded": model is not None,
+        "model_path": MODEL_PATH,
+        "model_file_exists": os.path.exists(MODEL_PATH),
         "tf_available": TF_AVAILABLE,
         "healthy_confidence_threshold": HEALTHY_CONFIDENCE_THRESHOLD,
         "min_confidence_threshold": MIN_CONFIDENCE_THRESHOLD,

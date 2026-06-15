@@ -8,7 +8,10 @@ This script: Trains or loads the model, exposes a FastAPI inference server.
 PlantVillage Dataset: 54,305 images across 38 plant disease categories
 """
 
+import json
 import os
+from pathlib import Path
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, models
@@ -21,8 +24,11 @@ IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
 EPOCHS = 20
 NUM_CLASSES = 38  # PlantVillage has 38 classes (plant + disease combinations)
-MODEL_SAVE_PATH = "models/plant_disease_model.h5"
-DATA_DIR = "data/PlantVillage"
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_SAVE_PATH = str(BASE_DIR / "models" / "plant_disease_model.h5")
+CLASS_INDICES_PATH = str(BASE_DIR / "models" / "class_indices.json")
+METRICS_PATH = str(BASE_DIR / "models" / "evaluation_metrics.json")
+DATA_DIR = str(BASE_DIR / "data" / "PlantVillage")
 
 # ─── PlantVillage Class Labels ──────────────────────────────────────────────
 CLASS_LABELS = [
@@ -114,7 +120,7 @@ def get_data_generators(data_dir: str):
 
 def train_model(data_dir: str = DATA_DIR):
     """Full training pipeline with callbacks."""
-    os.makedirs("models", exist_ok=True)
+    os.makedirs(str(BASE_DIR / "models"), exist_ok=True)
 
     print("📦 Loading dataset...")
     train_gen, val_gen = get_data_generators(data_dir)
@@ -156,8 +162,53 @@ def train_model(data_dir: str = DATA_DIR):
         callbacks=callbacks
     )
 
+    with open(CLASS_INDICES_PATH, "w", encoding="utf-8") as handle:
+        json.dump(train_gen.class_indices, handle, indent=2, sort_keys=True)
+
+    metrics = evaluate_model(model, val_gen)
+    with open(METRICS_PATH, "w", encoding="utf-8") as handle:
+        json.dump(metrics, handle, indent=2)
+
     print(f"✅ Model saved to {MODEL_SAVE_PATH}")
     return model, history
+
+
+def evaluate_model(model: tf.keras.Model, val_gen) -> dict:
+    """Compute validation metrics and a confusion matrix from the validation generator."""
+    y_true = val_gen.classes
+    y_prob = model.predict(val_gen, verbose=0)
+    y_pred = np.argmax(y_prob, axis=1)
+    num_classes = int(val_gen.num_classes)
+
+    confusion = np.zeros((num_classes, num_classes), dtype=int)
+    for true_label, predicted_label in zip(y_true, y_pred):
+        confusion[int(true_label), int(predicted_label)] += 1
+
+    accuracy = float(np.mean(y_true == y_pred)) if len(y_true) else 0.0
+    precision_scores = []
+    recall_scores = []
+    f1_scores = []
+
+    for class_index in range(num_classes):
+        true_positive = int(confusion[class_index, class_index])
+        false_positive = int(confusion[:, class_index].sum() - true_positive)
+        false_negative = int(confusion[class_index, :].sum() - true_positive)
+
+        precision = true_positive / (true_positive + false_positive) if (true_positive + false_positive) else 0.0
+        recall = true_positive / (true_positive + false_negative) if (true_positive + false_negative) else 0.0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+
+        precision_scores.append(precision)
+        recall_scores.append(recall)
+        f1_scores.append(f1)
+
+    return {
+        "accuracy": round(accuracy, 4),
+        "precision_macro": round(float(np.mean(precision_scores)), 4) if precision_scores else 0.0,
+        "recall_macro": round(float(np.mean(recall_scores)), 4) if recall_scores else 0.0,
+        "f1_macro": round(float(np.mean(f1_scores)), 4) if f1_scores else 0.0,
+        "confusion_matrix": confusion.tolist(),
+    }
 
 
 def load_model_for_inference():
