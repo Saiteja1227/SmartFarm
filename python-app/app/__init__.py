@@ -19,7 +19,6 @@ def create_app():
     # ── Core config ────────────────────────────────────────────────────────
     app.config["SECRET_KEY"]         = os.getenv("SECRET_KEY", "smartfarm-dev-key")
     app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", 10 * 1024 * 1024))
-    app.config["ALLOW_DEMO_FALLBACK"] = os.getenv("ALLOW_DEMO_FALLBACK", "true").lower() == "true"
     app.config["UPLOAD_FOLDER"]      = os.path.join(os.path.dirname(__file__), "static", "uploads")
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 

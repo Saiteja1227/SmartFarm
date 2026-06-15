@@ -231,17 +231,15 @@ def demo_predict(image_bytes: bytes) -> dict:
 # ════════════════════════════════════════════════════════════════════════════
 
 def _call_ml_server(file_path: str, file_name: str) -> dict | None:
-    raw_url = (
-        os.getenv("ML_MODEL_URL", "")
-        or os.getenv("ML_MODEL_HOSTPORT", "")
-        or os.getenv("SMARTFARM_ML_URL", "")
-    ).strip().rstrip("/")
+    """
+    Try the external ML server if ML_MODEL_URL is set to a real URL.
+    Returns None (triggering built-in analyser) in all other cases.
+    """
+    raw_url = os.getenv("ML_MODEL_URL", "").strip().rstrip("/")
 
-    if not raw_url or raw_url == "http://localhost:8000":
-        if current_app.config.get("ALLOW_DEMO_FALLBACK", True):
-            current_app.logger.info("No production ML service configured. Using built-in analyser.")
-            return None
-        current_app.logger.warning("ML service URL is not configured; using built-in analyser as a safe fallback.")
+    # Skip if not set, empty, or pointing at localhost
+    if not raw_url or "localhost" in raw_url or "127.0.0.1" in raw_url:
+        current_app.logger.info("Built-in visual analyser active (no external ML service).")
         return None
 
     ml_url = raw_url if "://" in raw_url else f"http://{raw_url}"
@@ -323,7 +321,8 @@ def analyze():
             result    = mongo.db.analyses.insert_one(doc)
             doc["_id"] = str(result.inserted_id)
         else:
-            doc["_id"] = unique_name   # use filename as local ID
+            from app.storage import save_local_analysis
+            doc = save_local_analysis(doc)
 
         return jsonify({"success": True, "message": "Analysis complete", "data": serialize(doc)}), 200
 

@@ -12,28 +12,10 @@ services:
       - key: FLASK_DEBUG
         value: "0"
       - key: MONGODB_URI
-        sync: false          # set this in Render dashboard — keep secret
+        sync: false
       - key: ML_MODEL_URL
-        fromService:
-          name: smartfarm-ml
-          type: pserv
-          property: hostport
-      - key: ALLOW_DEMO_FALLBACK
-        value: "false"
+        value: ""
       - key: MAX_CONTENT_LENGTH
         value: "10485760"
       - key: SECRET_KEY
-        generateValue: true  # Render auto-generates a secure value
-
-  - type: pserv
-    name: smartfarm-ml
-    runtime: python
-    pythonVersion: "3.11"
-    rootDir: python-app/ml_model
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: REQUIRE_REAL_MODEL
-        value: "true"
-      - key: MODEL_PATH
-        value: models/plant_disease_model.h5
+        generateValue: true
